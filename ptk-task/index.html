@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>PTK Experiment</title>
+<style>
+body {
+  background: white; 
+  color: black; 
+  font-size: 2em; 
+  text-align: center; 
+  font-family: Arial, sans-serif;
+}
+#mouth {
+  width: 400px; 
+  margin:auto;
+  display:none;
+}
+.hidden { display:none; }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1 -->
+<div id="slide1">
+  <p>Say "pa-ta-ka" when you see a flashing mouth.</p>
+  <p>Press SPACEBAR when you are ready.</p>
+</div>
+
+<!-- SLIDE 2 -->
+<div id="slide2" class="hidden">
+  <p id="countdown"></p>
+</div>
+
+<!-- SLIDE 3 -->
+<div id="slide3" class="hidden">
+  <img id="mouth" src="mouth1.png"/>
+</div>
+
+
+<script>
+let step = 1;
+let mediaRecorder;
+let chunks = [];
+
+document.body.onkeyup = async (e) => {
+  if(step===1 && e.code==="Space"){
+    document.getElementById("slide1").classList.add("hidden");
+    document.getElementById("slide2").classList.remove("hidden");
+    step = 2;
+
+    // ---- COUNTDOWN 3,2,1 ----
+    let c = 3;
+    document.getElementById("countdown").innerText = c;
+    let iv = setInterval(()=>{
+      c--;
+      if(c<=0){
+        clearInterval(iv);
+        document.getElementById("slide2").classList.add("hidden");
+        document.getElementById("slide3").classList.remove("hidden");
+        startRecording();
+      } else {
+        document.getElementById("countdown").innerText = c;
+      }
+    },1000);
+  }
+}
+
+
+async function startRecording(){
+  const stream = await navigator.mediaDevices.getUserMedia({audio:true, video:true});
+
+  // ---- START FLASHING ----
+  const mouth = document.getElementById("mouth");
+  mouth.style.display = "block";
+  let visible = true;
+  let flash = setInterval(()=>{
+    visible = !visible;
+    mouth.style.visibility = visible ? "visible" : "hidden";
+  },200);
+
+  // ---- START RECORDING ----
+  mediaRecorder = new MediaRecorder(stream);
+  mediaRecorder.ondataavailable = e => chunks.push(e.data);
+
+  mediaRecorder.onstop = e => {
+    clearInterval(flash);
+
+    const blob = new Blob(chunks,{type:"video/webm"});
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "participant_recording.webm";
+    a.textContent = "Download recording";
+    document.body.appendChild(a);
+  };
+
+  mediaRecorder.start();
+
+  // ---- RECORD 20 SEC ----
+  setTimeout(()=>{
+    mediaRecorder.stop();
+  },20000);
+}
+</script>
+
+</body>
+</html>
