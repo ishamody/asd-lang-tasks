@@ -129,8 +129,18 @@
       container.innerHTML = `
         <h2>Task Complete</h2>
         <p>Thank you for participating.</p>
+        <p>You may now return to the main page.</p>
       `;
+
+      // ✅ MARK THIS EXPERIMENT AS COMPLETE
+      localStorage.setItem("done_exp2", "true");
+
+      // optional: return to hub automatically
+      setTimeout(() => {
+        window.location.href = "../index.html";
+      }, 3000);
     }
+
 
     /* ---------- KEY HANDLING ---------- */
 
