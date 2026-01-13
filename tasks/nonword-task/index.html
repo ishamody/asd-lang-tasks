@@ -114,19 +114,24 @@
       const blob = new Blob(chunks, { type: "audio/webm" });
       const stimulus = stimuli[currentStim].label;
       const trial = currentStim + 1;
-      
-      await uploadRecording(blob, {
+
+      // 🚫 DO NOT BLOCK THE TASK
+      uploadRecording(blob, {
         participant,
         task: "NW",
         trial,
         stimulus,
         duration_ms: 3000,
         filename: `${participant}_NW_T${trial}_${stimulus}.webm`
+      }).catch(err => {
+        console.warn("Upload failed, continuing anyway", err);
       });
 
+      // ✅ ADVANCE IMMEDIATELY
       currentStim++;
       currentStim < stimuli.length ? showPrep() : showComplete();
     }
+
 
 
     function showComplete() {

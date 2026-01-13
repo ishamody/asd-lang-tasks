@@ -95,23 +95,26 @@ async function startRecording() {
   mediaRecorder = new MediaRecorder(stream);
   mediaRecorder.ondataavailable = e => chunks.push(e.data);
 
-  mediaRecorder.onstop = async () => {
-    clearInterval(flashInterval);
-    stream.getTracks().forEach(t => t.stop());
+    mediaRecorder.onstop = () => {
+      clearInterval(flashInterval);
+      stream.getTracks().forEach(t => t.stop());
 
-    const blob = new Blob(chunks, { type: "video/webm" });
+      const blob = new Blob(chunks, { type: "video/webm" });
 
-    await uploadRecording(blob, {
-      participant,
-      task: "PTK",
-      trial: 1,
-      stimulus: "pataka",
-      duration_ms: 20000,
-      filename: `${participant}_PTK_T01_pataka.webm`
-    });
+      uploadRecording(blob, {
+        participant,
+        task: "PTK",
+        trial: 1,
+        stimulus: "pataka",
+        duration_ms: 20000,
+        filename: `${participant}_PTK_T01_pataka.webm`
+      }).catch(err => {
+        console.warn("PTK upload failed, continuing", err);
+      });
 
-    showComplete();
-  };
+      showComplete();
+    };
+
 
   mediaRecorder.start();
 

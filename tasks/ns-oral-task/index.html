@@ -182,19 +182,20 @@
       setTimeout(() => mediaRecorder.stop(), 5000);
     }
 
-    async function handleStop() {
+    function handleStop() {
       const blob = new Blob(chunks, { type: "video/webm" });
       const duration_ms = Date.now() - recordingStartTime;
-
       const trial = currentStim + 1;
 
-      await uploadRecording(blob, {
+      uploadRecording(blob, {
         participant,
         task: "MM",
         trial,
         stimulus: `mouth${trial}`,
         duration_ms,
         filename: `${participant}_MM_T${trial}_mouth${trial}.webm`
+      }).catch(err => {
+        console.warn("MM upload failed, continuing", err);
       });
 
       currentStim++;
@@ -205,6 +206,7 @@
         showComplete();
       }
     }
+
 
     function showComplete() {
       container.className = "";
