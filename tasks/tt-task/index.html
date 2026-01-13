@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Tongue Twister Experiment</title>
-
+  <title>Tongue Twister Task</title>
+  
   <style>
     body, html {
       margin: 0;
       padding: 0;
       width: 100%;
       height: 100%;
-      font-family: sans-serif;
+      font-family: Arial, sans-serif;
       background: white;
       display: flex;
       justify-content: center;
@@ -22,9 +22,9 @@
       width: 100%;
       height: 100%;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
-      flex-direction: column;
       padding: 40px;
     }
 
@@ -41,7 +41,12 @@
 <body>
   <div id="container"></div>
 
-  <script>
+  <script type="module">
+    import { getParticipantId } from "../shared/participant.js";
+    import { uploadRecording } from "../shared/upload.js";
+
+    const participant = getParticipantId();
+
     const container = document.getElementById("container");
 
     const stimuli = [
@@ -55,10 +60,11 @@
     ];
 
     let currentStim = 0;
-    let recorder = null;
+    let mediaRecorder = null;
     let chunks = [];
     let stream = null;
     let recording = false;
+    let recordingStartTime = null;
 
     /* ---------- SCREENS ---------- */
 
@@ -66,14 +72,14 @@
       container.innerHTML = `
         <h2>Instructions</h2>
         <p>Say each tongue twister <strong>three times</strong> as fast and as accurately as you can.</p>
-        <p>Press the <strong>space bar</strong> to continue.</p>
+        <p>Press <strong>SPACE</strong> to continue.</p>
       `;
     }
 
     function showPrep() {
       container.innerHTML = `
         <h2>Get Ready</h2>
-        <p>Press the <strong>space bar</strong> when you’re ready.</p>
+        <p>Press <strong>SPACE</strong> to begin recording.</p>
       `;
     }
 
@@ -83,41 +89,48 @@
       container.innerHTML = `
         <div class="twister-text">${text}</div>
         <p>Say this tongue twister <strong>3 times</strong>.</p>
-        <p>Press <strong>space</strong> when finished.</p>
+        <p>Press <strong>SPACE</strong> when finished.</p>
       `;
 
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       chunks = [];
 
-      recorder = new MediaRecorder(stream);
-      recorder.ondataavailable = e => chunks.push(e.data);
-      recorder.onstop = saveRecording;
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => chunks.push(e.data);
+      mediaRecorder.onstop = handleStop;
 
-      recorder.start();
+      recordingStartTime = Date.now();
+      mediaRecorder.start();
       recording = true;
     }
 
     function stopRecording() {
       if (!recording) return;
       recording = false;
-      recorder.stop();
+      mediaRecorder.stop();
       stream.getTracks().forEach(t => t.stop());
     }
 
-    function saveRecording() {
+    async function handleStop() {
       const blob = new Blob(chunks, { type: "audio/webm" });
-      const url = URL.createObjectURL(blob);
 
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `twister_${currentStim + 1}.webm`;
-      document.body.appendChild(a);
-      a.click();
+      const participant =
+        localStorage.getItem("participant_id") || "P000";
 
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const trial = currentStim + 1;
+      const duration_ms = Date.now() - recordingStartTime;
+
+      await uploadRecording(blob, {
+        participant,
+        task: "TT",
+        trial,
+        stimulus: `twister${trial}`,
+        duration_ms,
+        filename: `${participant}_TT_T${trial}_twister${trial}.webm`
+      });
 
       currentStim++;
+
       if (currentStim < stimuli.length) {
         showPrep();
       } else {
@@ -132,15 +145,12 @@
         <p>You may now return to the main page.</p>
       `;
 
-      // ✅ MARK THIS EXPERIMENT AS COMPLETE
       localStorage.setItem("done_exp3", "true");
 
-      // optional: return to hub automatically
       setTimeout(() => {
         window.location.href = "../index.html";
       }, 3000);
     }
-
 
     /* ---------- KEY HANDLING ---------- */
 

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mouth Movement Experiment</title>
+  <title>Mouth Movement Task</title>
 
   <style>
     body, html {
@@ -48,7 +48,6 @@
       left: 50%;
       transform: translate(-50%, -50%) scaleX(-1);
       width: 300px;
-      height: auto;
     }
 
     #stimulusVideo {
@@ -61,16 +60,22 @@
 <body>
   <div id="container"></div>
 
-  <script>
+
+  <script type="module">
+    import { getParticipantId } from "../shared/participant.js";
+    import { uploadRecording } from "../shared/upload.js";
+
+    const participant = getParticipantId();
+
     const container = document.getElementById("container");
 
-    const stimuli = ["stimulus.webm"]; // add more if needed
+    const stimuli = ["stimulus.webm"];
     let currentStim = 0;
 
-    let stream = null;
-    let recorder = null;
+    let cameraStream = null;
+    let mediaRecorder = null;
     let chunks = [];
-    let recording = false;
+    let recordingStartTime = null;
 
     /* ---------- SCREENS ---------- */
 
@@ -78,10 +83,10 @@
       container.className = "";
       container.innerHTML = `
         <h2>Instructions</h2>
-        <p>You will watch a short video showing mouth movements.</p>
-        <p>After each video, you will record yourself copying the movements.</p>
-        <p><strong>Only your mouth will be recorded.</strong></p>
-        <p>Press <strong>space</strong> to continue.</p>
+        <p>You will watch a video of mouth movements.</p>
+        <p>Then you will copy the movements.</p>
+        <p>Only your mouth will be recorded.</p>
+        <p>Press <strong>SPACE</strong> to continue.</p>
       `;
     }
 
@@ -89,7 +94,7 @@
       container.className = "";
       container.innerHTML = `
         <h2>Get Ready</h2>
-        <p>Press <strong>space</strong> to align your mouth.</p>
+        <p>Press <strong>SPACE</strong> to align your mouth.</p>
       `;
     }
 
@@ -97,21 +102,21 @@
       container.className = "black-screen";
       container.innerHTML = "";
 
-      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
 
       const mouthBox = document.createElement("div");
       mouthBox.id = "mouthBox";
 
       const video = document.createElement("video");
       video.autoplay = true;
-      video.srcObject = stream;
+      video.srcObject = cameraStream;
 
       mouthBox.appendChild(video);
       container.appendChild(mouthBox);
 
       container.innerHTML += `
         <p>Align your mouth in the box.</p>
-        <p>Press <strong>space</strong> when aligned.</p>
+        <p>Press <strong>SPACE</strong> when aligned.</p>
       `;
     }
 
@@ -120,7 +125,7 @@
       container.innerHTML = `
         <video id="stimulusVideo" autoplay></video>
         <p>Watch carefully.</p>
-        <p>Press <strong>space</strong> to record when finished.</p>
+        <p>Press <strong>SPACE</strong> to begin recording.</p>
       `;
 
       document.getElementById("stimulusVideo").src = stimuli[currentStim];
@@ -135,25 +140,23 @@
 
       const video = document.createElement("video");
       video.autoplay = true;
-      video.srcObject = stream;
+      video.srcObject = cameraStream;
 
       mouthBox.appendChild(video);
       container.appendChild(mouthBox);
-
-      container.innerHTML += `<p>Recording for 5 seconds…</p>`;
+      container.innerHTML += `<p>Recording…</p>`;
 
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
-
       const canvasStream = canvas.captureStream(30);
-      recorder = new MediaRecorder(canvasStream, { mimeType: "video/webm" });
 
       chunks = [];
-      recorder.ondataavailable = e => chunks.push(e.data);
-      recorder.onstop = saveRecording;
+      mediaRecorder = new MediaRecorder(canvasStream, { mimeType: "video/webm" });
+      mediaRecorder.ondataavailable = e => chunks.push(e.data);
+      mediaRecorder.onstop = handleStop;
 
-      recorder.start();
-      recording = true;
+      recordingStartTime = Date.now();
+      mediaRecorder.start();
 
       const start = Date.now();
 
@@ -176,25 +179,26 @@
       }
 
       draw();
-      setTimeout(() => recorder.stop(), 5000);
+      setTimeout(() => mediaRecorder.stop(), 5000);
     }
 
-    function saveRecording() {
-      recording = false;
-
+    async function handleStop() {
       const blob = new Blob(chunks, { type: "video/webm" });
-      const url = URL.createObjectURL(blob);
+      const duration_ms = Date.now() - recordingStartTime;
 
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `mouth_${currentStim + 1}.webm`;
-      document.body.appendChild(a);
-      a.click();
+      const trial = currentStim + 1;
 
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await uploadRecording(blob, {
+        participant,
+        task: "MM",
+        trial,
+        stimulus: `mouth${trial}`,
+        duration_ms,
+        filename: `${participant}_MM_T${trial}_mouth${trial}.webm`
+      });
 
       currentStim++;
+
       if (currentStim < stimuli.length) {
         showStimulus();
       } else {
@@ -207,10 +211,8 @@
       container.innerHTML = `
         <h2>Task Complete</h2>
         <p>Thank you for participating.</p>
-        <p>You may now return to the main page.</p>
       `;
 
-      // ✅ mark experiment complete
       localStorage.setItem("done_exp4", "true");
 
       setTimeout(() => {

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PTK Experiment</title>
+
+<style>
+body {
+  background: white;
+  color: black;
+  font-size: 2em;
+  text-align: center;
+  font-family: Arial, sans-serif;
+}
+
+#mouth {
+  width: 400px;
+  margin: auto;
+  display: none;
+}
+
+.hidden { display: none; }
+</style>
+</head>
+
+<body>
+
+<!-- SLIDE 1 -->
+<div id="slide1">
+  <p>Say <strong>"pa-ta-ka"</strong> when you see a flashing mouth.</p>
+  <p>Press <strong>SPACEBAR</strong> when you are ready.</p>
+</div>
+
+<!-- SLIDE 2 -->
+<div id="slide2" class="hidden">
+  <p id="countdown"></p>
+</div>
+
+<!-- SLIDE 3 -->
+<div id="slide3" class="hidden">
+  <img id="mouth" src="mouth1.png"/>
+</div>
+
+<script type="module">
+import { getParticipantId } from "../shared/participant.js";
+import { uploadRecording } from "../shared/upload.js";
+
+const participant = getParticipantId();
+
+let step = 1;
+let mediaRecorder;
+let chunks = [];
+
+document.body.onkeyup = (e) => {
+  if (step === 1 && e.code === "Space") {
+    document.getElementById("slide1").classList.add("hidden");
+    document.getElementById("slide2").classList.remove("hidden");
+    step = 2;
+
+    let c = 3;
+    const countdown = document.getElementById("countdown");
+    countdown.innerText = c;
+
+    const iv = setInterval(() => {
+      c--;
+      if (c === 0) {
+        clearInterval(iv);
+        document.getElementById("slide2").classList.add("hidden");
+        document.getElementById("slide3").classList.remove("hidden");
+        startRecording();
+      } else {
+        countdown.innerText = c;
+      }
+    }, 1000);
+  }
+};
+
+async function startRecording() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: true
+  });
+
+  const mouth = document.getElementById("mouth");
+  mouth.style.display = "block";
+
+  let visible = true;
+  const flashInterval = setInterval(() => {
+    visible = !visible;
+    mouth.style.visibility = visible ? "visible" : "hidden";
+  }, 200);
+
+  chunks = []; // ✅ IMPORTANT: reset per trial
+
+  mediaRecorder = new MediaRecorder(stream);
+  mediaRecorder.ondataavailable = e => chunks.push(e.data);
+
+  mediaRecorder.onstop = async () => {
+    clearInterval(flashInterval);
+    stream.getTracks().forEach(t => t.stop());
+
+    const blob = new Blob(chunks, { type: "video/webm" });
+
+    await uploadRecording(blob, {
+      participant,
+      task: "PTK",
+      trial: 1,
+      stimulus: "pataka",
+      duration_ms: 20000,
+      filename: `${participant}_PTK_T01_pataka.webm`
+    });
+
+    showComplete();
+  };
+
+  mediaRecorder.start();
+
+  setTimeout(() => {
+    mediaRecorder.stop();
+  }, 20000);
+}
+
+function showComplete() {
+  document.getElementById("slide3").classList.add("hidden");
+  document.body.innerHTML = `
+    <p><strong>Task Complete</strong></p>
+    <p>Thank you for participating.</p>
+    <p>You may now return to the main page.</p>
+  `;
+
+  localStorage.setItem("done_exp1", "true");
+
+  setTimeout(() => {
+    window.location.href = "../index.html";
+  }, 3000);
+}
+</script>
+
+</body>
+</html>

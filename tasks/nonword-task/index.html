@@ -45,7 +45,12 @@
 <body>
   <div id="container"></div>
 
-  <script>
+  <script type="module">
+    import { getParticipantId } from "../shared/participant.js";
+    import { uploadRecording } from "../shared/upload.js";
+
+    const participant = getParticipantId();
+
     const container = document.getElementById("container");
 
     const stimuli = [
@@ -103,29 +108,26 @@
       setTimeout(() => recorder.stop(), 3000);
     }
 
-    function saveRecording(stream) {
+    async function saveRecording(stream) {
       stream.getTracks().forEach(t => t.stop());
 
-      const label = stimuli[currentStim].label;
       const blob = new Blob(chunks, { type: "audio/webm" });
-      const url = URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `response_${label}.webm`;
-      document.body.appendChild(a);
-      a.click();
-
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const stimulus = stimuli[currentStim].label;
+      const trial = currentStim + 1;
+      
+      await uploadRecording(blob, {
+        participant,
+        task: "NW",
+        trial,
+        stimulus,
+        duration_ms: 3000,
+        filename: `${participant}_NW_T${trial}_${stimulus}.webm`
+      });
 
       currentStim++;
-      if (currentStim < stimuli.length) {
-        showPrep();
-      } else {
-        showComplete();
-      }
+      currentStim < stimuli.length ? showPrep() : showComplete();
     }
+
 
     function showComplete() {
       container.innerHTML = `
