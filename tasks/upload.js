@@ -11,4 +11,8 @@ export async function uploadRecording(blob, meta) {
   });
 
   if (!res.ok) throw new Error("Upload failed");
+
+  //from apps script
+  const data = await res.json();
+  return data;
 }

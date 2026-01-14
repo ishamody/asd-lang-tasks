@@ -138,9 +138,9 @@ async function finishRecording(stream) {
 
     try {
       const response = await uploadRecording(blob, { participant, task, trial, filename });
-      console.log("Upload response:", response);
+      console.log("Upload response from ptk:", response);
     } catch (err) {
-      console.error("Upload failed:", err);
+      console.error("Upload failed from ptk:", err);
     }
 
   showComplete();
