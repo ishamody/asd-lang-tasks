@@ -1,65 +1,161 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Nonword</title>
-<style>
-body, html {
-  margin: 0; width: 100%; height: 100%;
-  display: flex; justify-content: center; align-items: center;
-  font-family: sans-serif;
-}
-</style>
+  <meta charset="UTF-8" />
+  <title>Nonword Repetition Experiment</title>
+
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: sans-serif;
+      background: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    #container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+
+    /* Flashing mouth image */
+    .mouth-flash {
+      width: 160px;
+      margin-bottom: 20px;
+      animation: mouthBlink 0.6s infinite;
+    }
+
+    @keyframes mouthBlink {
+      0%   { opacity: 1; }
+      50%  { opacity: 0.25; }
+      100% { opacity: 1; }
+    }
+  </style>
 </head>
 
 <body>
-<div id="container"></div>
+  <div id="container"></div>
 
-<script src="../upload.js"></script>
-<script>
-const container = document.getElementById("container");
-const stimuli = [
-  { label: "naib", file: "stimuli/naib.mp3" },
-  { label: "tef", file: "stimuli/tef.mp3" }
-];
+  <script>
+    const container = document.getElementById("container");
 
-let currentStim = 0, recorder, chunks = [];
+    const stimuli = [
+      { label: "naib", file: "stimuli/naib.mp3" },
+      { label: "tef",  file: "stimuli/tef.mp3"  },
+      { label: "zosh", file: "stimuli/zosh.mp3" },
+      { label: "plim", file: "stimuli/plim.mp3" },
+      { label: "gorp", file: "stimuli/gorp.mp3" }
+    ];
 
-function playStimulus() {
-  const audio = new Audio(stimuli[currentStim].file);
-  audio.play();
-  audio.onended = record;
-}
+    let currentStim = 0;
+    let recorder;
+    let chunks = [];
 
-async function record() {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  chunks = [];
-  recorder = new MediaRecorder(stream);
-  recorder.ondataavailable = e => chunks.push(e.data);
-  recorder.onstop = async () => {
-    stream.getTracks().forEach(t => t.stop());
-    const blob = new Blob(chunks, { type: "audio/webm" });
+    /* ---------- SCREENS ---------- */
 
-    await uploadBlob(blob, `nw_${stimuli[currentStim].label}.webm`, {
-      task: "nonword",
-      stimulus: stimuli[currentStim].label
+    function showInstructions() {
+      container.innerHTML = `
+        <h2>Instructions</h2>
+        <p>You will hear a made-up word.</p>
+        <p>Repeat the word out loud when prompted.</p>
+        <p>Your response will be recorded for 3 seconds.</p>
+        <p><strong>Press SPACE to continue.</strong></p>
+      `;
+    }
+
+    function showPrep() {
+      container.innerHTML = `
+        <h2>Get Ready</h2>
+        <p>Press SPACE to hear the next word.</p>
+      `;
+    }
+
+    function playStimulus() {
+      container.innerHTML = `<h2>Listen…</h2>`;
+      const audio = new Audio(stimuli[currentStim].file);
+      audio.play();
+      audio.onended = () => setTimeout(showRecording, 300);
+    }
+
+    async function showRecording() {
+      container.innerHTML = `
+        <img src="mouth1.png" class="mouth-flash" alt="mouth cue">
+        <p>Repeat the word</p>
+      `;
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      chunks = [];
+      recorder = new MediaRecorder(stream);
+
+      recorder.ondataavailable = e => chunks.push(e.data);
+      recorder.onstop = () => saveRecording(stream);
+
+      recorder.start();
+      setTimeout(() => recorder.stop(), 3000);
+    }
+
+    function saveRecording(stream) {
+      stream.getTracks().forEach(t => t.stop());
+
+      const label = stimuli[currentStim].label;
+      const blob = new Blob(chunks, { type: "audio/webm" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `response_${label}.webm`;
+      document.body.appendChild(a);
+      a.click();
+
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      currentStim++;
+      if (currentStim < stimuli.length) {
+        showPrep();
+      } else {
+        showComplete();
+      }
+    }
+
+    function showComplete() {
+      container.innerHTML = `
+        <h2>Task Complete</h2>
+        <p>Thank you for participating.</p>
+        <p>You may now return to the main page.</p>
+      `;
+
+      // ✅ MARK THIS EXPERIMENT AS COMPLETE
+      localStorage.setItem("done_exp2", "true");
+
+      // optional: return to hub automatically
+      setTimeout(() => {
+        window.location.href = "../../index.html";
+      }, 3000);
+    }
+
+    /* ---------- KEY HANDLING ---------- */
+
+    window.addEventListener("keydown", e => {
+      if (e.code !== "Space") return;
+
+      if (container.innerText.includes("Instructions")) {
+        showPrep();
+      } else if (container.innerText.includes("Get Ready")) {
+        playStimulus();
+      }
     });
 
-    currentStim++;
-    currentStim < stimuli.length ? playStimulus() : done();
-  };
-
-  recorder.start();
-  setTimeout(() => recorder.stop(), 3000);
-}
-
-function done() {
-  container.innerHTML = `<h2>Done</h2>`;
-  localStorage.setItem("done_exp2", "true");
-  setTimeout(() => location.href = "../../index.html", 2000);
-}
-
-playStimulus();
-</script>
+    showInstructions();
+  </script>
 </body>
 </html>
