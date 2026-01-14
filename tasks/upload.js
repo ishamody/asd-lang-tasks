@@ -1,18 +1,22 @@
 const UPLOAD_URL = "https://script.google.com/macros/s/AKfycbxfh-i2un5ySQVDUQnJX2jzTcI6ImhasYk1kXqiB9JB9E_hVTFjmZmqgAqW2IKLjaP4Aw/exec";
 
 export async function uploadRecording(blob, meta) {
-  const form = new FormData();
-  form.append("file", blob);
-  form.append("meta", JSON.stringify(meta));
+  const reader = new FileReader();
+
+  const base64 = await new Promise(resolve => {
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.readAsDataURL(blob);
+  });
 
   const res = await fetch(UPLOAD_URL, {
     method: "POST",
-    body: form
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ meta, fileBase64: base64 })
   });
 
   if (!res.ok) throw new Error("Upload failed");
 
-  //from apps script
-  const data = await res.json();
-  return data;
+  const data = await res.json();   // parse JSON response
+  console.log("Apps Script response:", data); // <-- THIS LOGS IT
+  return data;                     // return to caller
 }
