@@ -137,8 +137,8 @@ async function finishRecording(stream) {
   const filename = `${participant}_${task}_T${trial}.webm`;
 
     try {
-      await uploadRecording(blob, { participant, task, trial, filename });
-      console.log("Upload successful:", filename);
+      const response = await uploadRecording(blob, { participant, task, trial, filename });
+      console.log("Upload response:", response);
     } catch (err) {
       console.error("Upload failed:", err);
     }
