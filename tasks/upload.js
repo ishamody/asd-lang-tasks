@@ -5,7 +5,7 @@ export async function uploadRecording(blob, meta) {
   form.append("file", blob);
   form.append("meta", JSON.stringify(meta));
 
-  const res = await fetch(UPLOAD_ENDPOINT, {
+  const res = await fetch(UPLOAD_URL, {
     method: "POST",
     body: form
   });

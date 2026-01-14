@@ -53,10 +53,16 @@ body {
 </div>
 
 <script>
+import { uploadRecording } from "../upload.js";
+import { getParticipantId } from "../shared/participant.js";
+
 let step = 1;
 let mediaRecorder;
 let chunks = [];
 let flashInterval;
+const participant = getParticipantId();
+const task = "PTK";
+const trial = 1; // PTK is usually one long trial
 
 /* ---------- KEY HANDLING ---------- */
 
@@ -127,13 +133,14 @@ function finishRecording(stream) {
   stream.getTracks().forEach(t => t.stop());
 
   const blob = new Blob(chunks, { type: "video/webm" });
-  const url = URL.createObjectURL(blob);
+  const filename = `${participant}_${task}_T${trial}.webm`;
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "participant_recording.webm";
-  a.textContent = "Download recording";
-  document.body.appendChild(a);
+    try {
+      uploadRecording(blob, { participant, task, trial, filename });
+      console.log("Upload successful:", filename);
+    } catch (err) {
+      console.error("Upload failed:", err);
+    }
 
   showComplete();
 }
