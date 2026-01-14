@@ -1,171 +1,91 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Tongue Twister Task</title>
-  
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      font-family: Arial, sans-serif;
-      background: white;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-    }
-
-    #container {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: 40px;
-    }
-
-    .twister-text {
-      font-size: 32px;
-      font-weight: 600;
-      max-width: 900px;
-      line-height: 1.4;
-      margin-bottom: 30px;
-    }
-  </style>
+<meta charset="UTF-8" />
+<title>Tongue Twister Experiment</title>
+<style>
+body, html {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  display: flex; justify-content: center; align-items: center;
+  font-family: sans-serif;
+}
+#container { text-align: center; padding: 40px; }
+.twister-text { font-size: 32px; margin-bottom: 30px; }
+</style>
 </head>
 
 <body>
-  <div id="container"></div>
+<div id="container"></div>
 
-  <script type="module">
-    import { getParticipantId } from "../shared/participant.js";
-    import { uploadRecording } from "../shared/upload.js";
+<script src="../upload.js"></script>
+<script>
+const container = document.getElementById("container");
 
-    const participant = getParticipantId();
+const stimuli = [
+  "She sells seashells by the seashore",
+  "How can a clam cram in a clean cream can?",
+  "If a dog chews shoes, whose shoes does he choose?",
+  "Six sticky skeletons",
+  "Red leather, yellow leather",
+  "Think sticks, thick bricks",
+  "Stupid superstition"
+];
 
-    const container = document.getElementById("container");
+let currentStim = 0;
+let recorder, chunks = [], stream, recording = false;
 
-    const stimuli = [
-      "She sells seashells by the seashore",
-      "How can a clam cram in a clean cream can?",
-      "If a dog chews shoes, whose shoes does he choose?",
-      "Six sticky skeletons",
-      "Red leather, yellow leather",
-      "Think sticks, thick bricks",
-      "Stupid superstition"
-    ];
+function showInstructions() {
+  container.innerHTML = `<h2>Instructions</h2><p>Press space to begin.</p>`;
+}
 
-    let currentStim = 0;
-    let mediaRecorder = null;
-    let chunks = [];
-    let stream = null;
-    let recording = false;
-    let recordingStartTime = null;
+function showPrep() {
+  container.innerHTML = `<h2>Get Ready</h2><p>Press space.</p>`;
+}
 
-    /* ---------- SCREENS ---------- */
+async function showRecording() {
+  container.innerHTML = `<div class="twister-text">${stimuli[currentStim]}</div>`;
+  stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  chunks = [];
+  recorder = new MediaRecorder(stream);
+  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder.onstop = saveRecording;
+  recorder.start();
+  recording = true;
+}
 
-    function showInstructions() {
-      container.innerHTML = `
-        <h2>Instructions</h2>
-        <p>Say each tongue twister <strong>three times</strong> as fast and as accurately as you can.</p>
-        <p>Press <strong>SPACE</strong> to continue.</p>
-      `;
-    }
+function stopRecording() {
+  if (!recording) return;
+  recording = false;
+  recorder.stop();
+  stream.getTracks().forEach(t => t.stop());
+}
 
-    function showPrep() {
-      container.innerHTML = `
-        <h2>Get Ready</h2>
-        <p>Press <strong>SPACE</strong> to begin recording.</p>
-      `;
-    }
+async function saveRecording() {
+  const blob = new Blob(chunks, { type: "audio/webm" });
 
-    async function showRecording() {
-      const text = stimuli[currentStim];
+  await uploadBlob(blob, `tt_${currentStim+1}.webm`, {
+    task: "tongue_twister",
+    trial: currentStim + 1
+  });
 
-      container.innerHTML = `
-        <div class="twister-text">${text}</div>
-        <p>Say this tongue twister <strong>3 times</strong>.</p>
-        <p>Press <strong>SPACE</strong> when finished.</p>
-      `;
+  currentStim++;
+  currentStim < stimuli.length ? showPrep() : showComplete();
+}
 
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      chunks = [];
+function showComplete() {
+  container.innerHTML = `<h2>Done</h2>`;
+  localStorage.setItem("done_exp3", "true");
+  setTimeout(() => location.href = "../../index.html", 2000);
+}
 
-      mediaRecorder = new MediaRecorder(stream);
-      mediaRecorder.ondataavailable = e => chunks.push(e.data);
-      mediaRecorder.onstop = handleStop;
+window.addEventListener("keydown", e => {
+  if (e.code !== "Space") return;
+  if (container.innerText.includes("Instructions")) showPrep();
+  else if (container.innerText.includes("Ready")) showRecording();
+  else if (recording) stopRecording();
+});
 
-      recordingStartTime = Date.now();
-      mediaRecorder.start();
-      recording = true;
-    }
-
-    function stopRecording() {
-      if (!recording) return;
-      recording = false;
-      mediaRecorder.stop();
-      stream.getTracks().forEach(t => t.stop());
-    }
-
-    function handleStop() {
-      const blob = new Blob(chunks, { type: "audio/webm" });
-      const trial = currentStim + 1;
-      const duration_ms = Date.now() - recordingStartTime;
-
-      uploadRecording(blob, {
-        participant,
-        task: "TT",
-        trial,
-        stimulus: `twister${trial}`,
-        duration_ms,
-        filename: `${participant}_TT_T${trial}_twister${trial}.webm`
-      }).catch(err => {
-        console.warn("TT upload failed, continuing", err);
-      });
-
-      currentStim++;
-
-      if (currentStim < stimuli.length) {
-        showPrep();
-      } else {
-        showComplete();
-      }
-    }
-
-
-    function showComplete() {
-      container.innerHTML = `
-        <h2>Task Complete</h2>
-        <p>Thank you for participating.</p>
-        <p>You may now return to the main page.</p>
-      `;
-
-      localStorage.setItem("done_exp3", "true");
-
-      setTimeout(() => {
-        window.location.href = "../../index.html";
-      }, 3000);
-    }
-
-    /* ---------- KEY HANDLING ---------- */
-
-    window.addEventListener("keydown", e => {
-      if (e.code !== "Space") return;
-
-      if (container.innerText.includes("Instructions")) {
-        showPrep();
-      } else if (container.innerText.includes("Get Ready")) {
-        showRecording();
-      } else if (recording) {
-        stopRecording();
-      }
-    });
-
-    showInstructions();
-  </script>
+showInstructions();
+</script>
 </body>
 </html>

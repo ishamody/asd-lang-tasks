@@ -1,244 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Mouth Movement Task</title>
-
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      font-family: sans-serif;
-      background: white;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-    }
-
-    #container {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      padding: 40px;
-    }
-
-    .black-screen {
-      background: black;
-      color: white;
-    }
-
-    #mouthBox {
-      width: 250px;
-      height: 120px;
-      border: 2px solid white;
-      overflow: hidden;
-      position: relative;
-      margin-bottom: 20px;
-    }
-
-    video {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) scaleX(-1);
-      width: 300px;
-    }
-
-    #stimulusVideo {
-      width: 300px;
-      margin-bottom: 20px;
-    }
-  </style>
+<meta charset="UTF-8" />
+<title>Mouth Movement</title>
+<style>
+body, html {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  display: flex; justify-content: center; align-items: center;
+  font-family: sans-serif;
+}
+#container { text-align: center; }
+.black { background: black; color: white; }
+</style>
 </head>
 
 <body>
-  <div id="container"></div>
+<div id="container"></div>
 
+<script src="../upload.js"></script>
+<script>
+const container = document.getElementById("container");
+const stimuli = ["stimulus.webm"];
+let currentStim = 0, recorder, chunks = [], stream;
 
-  <script type="module">
-    import { getParticipantId } from "../shared/participant.js";
-    import { uploadRecording } from "../shared/upload.js";
+async function showRecording() {
+  container.className = "black";
+  stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  recorder = new MediaRecorder(stream);
+  chunks = [];
+  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder.onstop = saveRecording;
+  recorder.start();
+  setTimeout(() => recorder.stop(), 5000);
+}
 
-    const participant = getParticipantId();
+async function saveRecording() {
+  stream.getTracks().forEach(t => t.stop());
+  const blob = new Blob(chunks, { type: "video/webm" });
 
-    const container = document.getElementById("container");
+  await uploadBlob(blob, `mouth_${currentStim+1}.webm`, {
+    task: "mouth_movement",
+    trial: currentStim + 1
+  });
 
-    const stimuli = ["stimulus.webm"];
-    let currentStim = 0;
+  currentStim++;
+  currentStim < stimuli.length ? showRecording() : showComplete();
+}
 
-    let cameraStream = null;
-    let mediaRecorder = null;
-    let chunks = [];
-    let recordingStartTime = null;
+function showComplete() {
+  container.className = "";
+  container.innerHTML = `<h2>Done</h2>`;
+  localStorage.setItem("done_exp4", "true");
+  setTimeout(() => location.href = "../../index.html", 2000);
+}
 
-    /* ---------- SCREENS ---------- */
-
-    function showInstructions() {
-      container.className = "";
-      container.innerHTML = `
-        <h2>Instructions</h2>
-        <p>You will watch a video of mouth movements.</p>
-        <p>Then you will copy the movements.</p>
-        <p>Only your mouth will be recorded.</p>
-        <p>Press <strong>SPACE</strong> to continue.</p>
-      `;
-    }
-
-    function showPrep() {
-      container.className = "";
-      container.innerHTML = `
-        <h2>Get Ready</h2>
-        <p>Press <strong>SPACE</strong> to align your mouth.</p>
-      `;
-    }
-
-    async function showCalibration() {
-      container.className = "black-screen";
-      container.innerHTML = "";
-
-      cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
-
-      const mouthBox = document.createElement("div");
-      mouthBox.id = "mouthBox";
-
-      const video = document.createElement("video");
-      video.autoplay = true;
-      video.srcObject = cameraStream;
-
-      mouthBox.appendChild(video);
-      container.appendChild(mouthBox);
-
-      container.innerHTML += `
-        <p>Align your mouth in the box.</p>
-        <p>Press <strong>SPACE</strong> when aligned.</p>
-      `;
-    }
-
-    function showStimulus() {
-      container.className = "";
-      container.innerHTML = `
-        <video id="stimulusVideo" autoplay></video>
-        <p>Watch carefully.</p>
-        <p>Press <strong>SPACE</strong> to begin recording.</p>
-      `;
-
-      document.getElementById("stimulusVideo").src = stimuli[currentStim];
-    }
-
-    function showRecording() {
-      container.className = "black-screen";
-      container.innerHTML = "";
-
-      const mouthBox = document.createElement("div");
-      mouthBox.id = "mouthBox";
-
-      const video = document.createElement("video");
-      video.autoplay = true;
-      video.srcObject = cameraStream;
-
-      mouthBox.appendChild(video);
-      container.appendChild(mouthBox);
-      container.innerHTML += `<p>Recording…</p>`;
-
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const canvasStream = canvas.captureStream(30);
-
-      chunks = [];
-      mediaRecorder = new MediaRecorder(canvasStream, { mimeType: "video/webm" });
-      mediaRecorder.ondataavailable = e => chunks.push(e.data);
-      mediaRecorder.onstop = handleStop;
-
-      recordingStartTime = Date.now();
-      mediaRecorder.start();
-
-      const start = Date.now();
-
-      function draw() {
-        const box = mouthBox.getBoundingClientRect();
-        const scaleX = video.videoWidth / video.clientWidth;
-        const scaleY = video.videoHeight / video.clientHeight;
-
-        const srcW = box.width * scaleX;
-        const srcH = box.height * scaleY;
-        const srcX = (video.videoWidth - srcW) / 2;
-        const srcY = (video.videoHeight - srcH) / 2;
-
-        canvas.width = box.width;
-        canvas.height = box.height;
-
-        ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height);
-
-        if (Date.now() - start < 5000) requestAnimationFrame(draw);
-      }
-
-      draw();
-      setTimeout(() => mediaRecorder.stop(), 5000);
-    }
-
-    function handleStop() {
-      const blob = new Blob(chunks, { type: "video/webm" });
-      const duration_ms = Date.now() - recordingStartTime;
-      const trial = currentStim + 1;
-
-      uploadRecording(blob, {
-        participant,
-        task: "MM",
-        trial,
-        stimulus: `mouth${trial}`,
-        duration_ms,
-        filename: `${participant}_MM_T${trial}_mouth${trial}.webm`
-      }).catch(err => {
-        console.warn("MM upload failed, continuing", err);
-      });
-
-      currentStim++;
-
-      if (currentStim < stimuli.length) {
-        showStimulus();
-      } else {
-        showComplete();
-      }
-    }
-
-
-    function showComplete() {
-      container.className = "";
-      container.innerHTML = `
-        <h2>Task Complete</h2>
-        <p>Thank you for participating.</p>
-      `;
-
-      localStorage.setItem("done_exp4", "true");
-
-      setTimeout(() => {
-        window.location.href = "../../index.html";
-      }, 3000);
-    }
-
-    /* ---------- KEY HANDLING ---------- */
-
-    window.addEventListener("keydown", e => {
-      if (e.code !== "Space") return;
-
-      if (container.innerText.includes("Instructions")) {
-        showPrep();
-      } else if (container.innerText.includes("Get Ready")) {
-        showCalibration();
-      } else if (container.innerText.includes("Align your mouth")) {
-        showStimulus();
-      } else if (container.innerText.includes("Watch carefully")) {
-        showRecording();
-      }
-    });
-
-    showInstructions();
-  </script>
+showRecording();
+</script>
 </body>
 </html>
