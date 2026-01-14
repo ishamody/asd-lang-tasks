@@ -66,13 +66,14 @@ const trial = 1; // PTK is usually one long trial
 
 /* ---------- KEY HANDLING ---------- */
 
-document.body.onkeyup = (e) => {
+window.addEventListener("keydown", (e) => {
   if (e.code !== "Space") return;
-
   if (step === 1) {
     startCountdown();
+    step = 2; // advance state so you don’t restart
   }
-};
+});
+
 
 /* ---------- FLOW ---------- */
 
