@@ -103,22 +103,51 @@
       setTimeout(() => recorder.stop(), 3000);
     }
 
-    function saveRecording(stream) {
+   async function saveRecording(stream) {
+      // Stop the microphone
       stream.getTracks().forEach(t => t.stop());
 
       const label = stimuli[currentStim].label;
-      const blob = new Blob(chunks, { type: "audio/webm" });
-      const url = URL.createObjectURL(blob);
+      const fileName = `response_${label}_${Date.now()}.webm`;
+      
+      // Ensure the blob type matches what the backend expects
+      const contentType = "audio/webm"; 
+      const blob = new Blob(chunks, { type: contentType });
 
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `response_${label}.webm`;
-      document.body.appendChild(a);
-      a.click();
+      try {
+        // 1. Get the pre-signed URL from your Flask backend
+        const response = await fetch("http://localhost:5000/get-presigned-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file_name: fileName })
+        });
+        
+        if (!response.ok) throw new Error("Failed to get pre-signed URL");
+        const { url } = await response.json();
 
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+        // 2. Upload the Blob directly to S3
+        // IMPORTANT: You MUST include the Content-Type header if the 
+        // backend included 'ContentType' in the signing Params.
+        const uploadResponse = await fetch(url, {
+          method: "PUT",
+          body: blob,
+          headers: {
+            "Content-Type": contentType
+          }
+        });
 
+        if (uploadResponse.ok) {
+          console.log(`Successfully uploaded: ${fileName}`);
+        } else {
+          const errorText = await uploadResponse.text();
+          console.error("Upload to S3 failed:", errorText);
+        }
+
+      } catch (error) {
+        console.error("Error in upload process:", error);
+      }
+
+      // Proceed to next stimulus
       currentStim++;
       if (currentStim < stimuli.length) {
         showPrep();
