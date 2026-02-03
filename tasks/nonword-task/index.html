@@ -116,7 +116,7 @@
 
       try {
         // 1. Get the pre-signed URL from your Flask backend
-        const response = await fetch("http://localhost:5000/get-presigned-url", {
+        const response = await fetch("http://3.236.16.152:5000/get-presigned-url", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ file_name: fileName })
