@@ -116,22 +116,22 @@ button {
   <h1>Speech Experiments</h1>
 
   <div class="experiment">
-    <label><input type="checkbox" class="check"> Diadochokinetic Task</label>
+    <label><input type="checkbox" class="check" disabled> Diadochokinetic Task</label>
     <a id="exp1" href="tasks/ptk-task/index.html">Start</a>
   </div>
 
   <div class="experiment">
-    <label><input type="checkbox" class="check"> Nonword Repetition Task</label>
+    <label><input type="checkbox" class="check" disabled> Nonword Repetition Task</label>
     <a id="exp2" href="tasks/nonword-task/index.html">Start</a>
   </div>
 
   <div class="experiment">
-    <label><input type="checkbox" class="check"> Tongue Twister Task</label>
+    <label><input type="checkbox" class="check" disabled> Tongue Twister Task</label>
     <a id="exp3" href="tasks/tt-task/index.html">Start</a>
   </div>
 
   <div class="experiment">
-    <label><input type="checkbox" class="check"> Non-speech Oral Task</label>
+    <label><input type="checkbox" class="check" disabled> Non-speech Oral Task</label>
     <a id="exp4" href="tasks/ns-oral-task/index.html">Start</a>
   </div>
 
@@ -176,14 +176,18 @@ function updateProgress() {
   experiments.forEach((exp, i) => {
     const link = document.getElementById(exp.id);
     const checkbox = link.parentElement.querySelector(".check");
+  
+    //TODO for presentation
+    link.classList.add("enabled");
+    checkbox.checked = true;
 
-    if (i === 0 || localStorage.getItem(experiments[i-1].key) === "true") {
-      link.classList.add("enabled");
-    }
+    // if (i === 0 || localStorage.getItem(experiments[i-1].key) === "true") {
+    //   link.classList.add("enabled");
+    // }
 
-    if (localStorage.getItem(exp.key) === "true") {
-      checkbox.checked = true;
-    }
+    // if (localStorage.getItem(exp.key) === "true") {
+    //   checkbox.checked = true;
+    // }
   });
 
   if (experiments.every(e => localStorage.getItem(e.key) === "true")) {
