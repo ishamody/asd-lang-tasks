@@ -21,29 +21,16 @@ flex-direction:column;
 text-align:center;
 }
 
-#videoWrapper{
-position:relative;
-}
-
-video{
+#mouthCanvas{
 width:500px;
-transform:scaleX(-1);
-}
-
-#mouthBox{
-position:absolute;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-width:250px;
-height:120px;
-border:3px solid white;
-pointer-events:none;
+height:250px;
+border:4px solid white;
+background:black;
 }
 
 #stimulusVideo{
 width:350px;
-background:black;
+margin-bottom:20px;
 }
 
 .hidden{
@@ -58,19 +45,16 @@ display:none;
 <div id="instructions">
 <h2>Instructions</h2>
 <p>You will watch a short video of mouth movements.</p>
-<p>Then you will record yourself copying them.</p>
-<p>Align your mouth inside the box.</p>
+<p>Then record yourself copying them.</p>
+<p>Only the area shown in the box is recorded.</p>
 <p><b>Press SPACE to begin.</b></p>
 </div>
 
 <div id="cameraScreen" class="hidden">
 
-<div id="videoWrapper">
-<video id="webcam" autoplay playsinline></video>
-<div id="mouthBox"></div>
-</div>
+<canvas id="mouthCanvas"></canvas>
 
-<p>Align your mouth inside the box.</p>
+<p>Place your mouth inside the box.</p>
 <p><b>Press SPACE when ready.</b></p>
 
 </div>
@@ -78,6 +62,7 @@ display:none;
 <div id="stimulusScreen" class="hidden">
 
 <video id="stimulusVideo"></video>
+
 <p>Watch carefully.</p>
 <p><b>Press SPACE to record.</b></p>
 
@@ -92,12 +77,9 @@ display:none;
 
 <script>
 
-const stimuli = [
-"stimulus.webm"
-]
+const stimuli = ["stimulus.webm"]
 
 let currentStim = 0
-
 let stream
 let recorder
 let chunks=[]
@@ -107,17 +89,65 @@ const cameraScreen = document.getElementById("cameraScreen")
 const stimulusScreen = document.getElementById("stimulusScreen")
 const completeScreen = document.getElementById("completeScreen")
 
-const webcam = document.getElementById("webcam")
-const mouthBox = document.getElementById("mouthBox")
+const mouthCanvas = document.getElementById("mouthCanvas")
+const ctx = mouthCanvas.getContext("2d")
+
 const stimulusVideo = document.getElementById("stimulusVideo")
 
+let webcam = document.createElement("video")
+webcam.autoplay = true
+webcam.playsInline = true
+
 let state = "instructions"
+
+const ZOOM = 2.7   // adjust zoom level
 
 async function startCamera(){
 
 stream = await navigator.mediaDevices.getUserMedia({video:true})
+
 webcam.srcObject = stream
 await webcam.play()
+
+mouthCanvas.width = 300
+mouthCanvas.height = 150
+
+drawPreview()
+
+}
+
+function drawPreview(){
+
+const canvasRatio = mouthCanvas.width / mouthCanvas.height
+
+let cropW = webcam.videoWidth / ZOOM
+let cropH = cropW / canvasRatio
+
+if (cropH > webcam.videoHeight / ZOOM){
+  cropH = webcam.videoHeight / ZOOM
+  cropW = cropH * canvasRatio
+}
+
+const startX = webcam.videoWidth/2 - cropW/2
+const startY = webcam.videoHeight/2 - cropH/2
+
+/* clear canvas */
+ctx.clearRect(0,0,mouthCanvas.width,mouthCanvas.height)
+
+/* flip canvas horizontally (removes mirror) */
+ctx.save()
+ctx.scale(-1,1)
+ctx.translate(-mouthCanvas.width,0)
+
+ctx.drawImage(
+webcam,
+startX,startY,cropW,cropH,
+0,0,mouthCanvas.width,mouthCanvas.height
+)
+
+ctx.restore()
+
+requestAnimationFrame(drawPreview)
 
 }
 
@@ -125,6 +155,7 @@ function showCamera(){
 
 instructions.classList.add("hidden")
 cameraScreen.classList.remove("hidden")
+
 state="camera"
 
 }
@@ -146,51 +177,15 @@ function startRecording(){
 stimulusScreen.classList.add("hidden")
 cameraScreen.classList.remove("hidden")
 
-const canvas = document.createElement("canvas")
-const ctx = canvas.getContext("2d")
-
-const box = mouthBox.getBoundingClientRect()
-const vid = webcam.getBoundingClientRect()
-
-canvas.width = box.width
-canvas.height = box.height
-
-const canvasStream = canvas.captureStream(30)
+const canvasStream = mouthCanvas.captureStream(30)
 
 recorder = new MediaRecorder(canvasStream,{mimeType:"video/webm"})
 chunks=[]
 
 recorder.ondataavailable = e=>chunks.push(e.data)
-
 recorder.onstop = saveRecording
 
 recorder.start()
-
-const start = Date.now()
-
-function draw(){
-
-const scaleX = webcam.videoWidth / vid.width
-const scaleY = webcam.videoHeight / vid.height
-
-const srcX = (box.left - vid.left) * scaleX
-const srcY = (box.top - vid.top) * scaleY
-const srcW = box.width * scaleX
-const srcH = box.height * scaleY
-
-ctx.drawImage(
-webcam,
-srcX,srcY,srcW,srcH,
-0,0,canvas.width,canvas.height
-)
-
-if(Date.now()-start < 5000){
-requestAnimationFrame(draw)
-}
-
-}
-
-draw()
 
 setTimeout(()=>recorder.stop(),5000)
 
