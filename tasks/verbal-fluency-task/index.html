@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Verbal Fluency Task</title>
+
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: sans-serif;
+      background: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    #container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      padding: 40px;
+      box-sizing: border-box;
+    }
+
+    .prompt {
+      font-size: 40px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+
+    textarea {
+      width: 700px;
+      height: 250px;
+      font-size: 24px;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    #timer {
+      font-size: 32px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="container"></div>
+
+  <script>
+    const container = document.getElementById("container");
+
+    const stimuli = [
+      {
+        type: "Category",
+        value: "Animals"
+      },
+      {
+        type: "Letter",
+        value: "F"
+      }
+    ];
+
+    let currentStim = 0;
+    let responses = [];
+
+    /* ---------- SCREENS ---------- */
+
+    function showInstructions() {
+      container.innerHTML = `
+        <h2>Instructions</h2>
+
+        <p>
+          You will see either a category or a letter.
+        </p>
+
+        <p>
+          Type as many words as you can that belong to that category
+          or begin with that letter.
+        </p>
+
+        <p>
+          Separate words with spaces, commas, or new lines.
+        </p>
+
+        <p>
+          You will have 30 seconds for each prompt.
+        </p>
+
+        <p>
+          <strong>Press SPACE to continue.</strong>
+        </p>
+      `;
+    }
+
+    function showPrep() {
+      container.innerHTML = `
+        <h2>Get Ready</h2>
+
+        <p>
+          Press SPACE to begin.
+        </p>
+      `;
+    }
+
+    function startTrial() {
+      const stim = stimuli[currentStim];
+
+      container.innerHTML = `
+        <div class="prompt">
+          ${stim.type}: ${stim.value}
+        </div>
+
+        <textarea
+          id="responseBox"
+          placeholder="Type words here..."
+        ></textarea>
+
+        <div id="timer">30</div>
+      `;
+
+      const textbox = document.getElementById("responseBox");
+      textbox.focus();
+
+      let timeLeft = 30;
+
+      const interval = setInterval(() => {
+        timeLeft--;
+
+        document.getElementById("timer").innerText = timeLeft;
+
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          saveTrial();
+        }
+      }, 1000);
+    }
+
+    async function saveTrial() {
+      const stim = stimuli[currentStim];
+
+      const text =
+        document.getElementById("responseBox").value;
+
+      responses.push({
+        trial: currentStim + 1,
+        type: stim.type,
+        stimulus: stim.value,
+        response: text
+      });
+
+      const csvRows = [
+        "trial,type,stimulus,response"
+      ];
+
+      responses.forEach(r => {
+        csvRows.push(
+          `${r.trial},"${r.type}","${r.stimulus}","${r.response.replace(/"/g, '""')}"`
+        );
+      });
+
+      const csvContent = csvRows.join("\n");
+
+      const blob = new Blob(
+        [csvContent],
+        { type: "text/csv" }
+      );
+
+      const fileName =
+        `verbal_fluency_trial_${currentStim + 1}.csv`;
+
+      try {
+        const response = await fetch(
+          "https://asd-lang-tasks-backend-production.up.railway.app/get-presigned-url",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              file_name: fileName
+            })
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to get presigned URL");
+        }
+
+        const data = await response.json();
+
+        const uploadResponse = await fetch(
+          data.url,
+          {
+            method: "PUT",
+            body: blob,
+            headers: {
+              "Content-Type": "text/csv"
+            }
+          }
+        );
+
+        if (uploadResponse.ok) {
+          console.log("CSV uploaded");
+        } else {
+          console.error("CSV upload failed");
+        }
+
+      } catch (err) {
+        console.error(err);
+      }
+
+      currentStim++;
+
+      if (currentStim < stimuli.length) {
+        showPrep();
+      } else {
+        showComplete();
+      }
+    }
+
+    function showComplete() {
+      container.innerHTML = `
+        <h2>Task Complete</h2>
+
+        <p>
+          Thank you for participating.
+        </p>
+
+        <p>
+          You may now return to the main page.
+        </p>
+      `;
+
+      localStorage.setItem("done_exp5", "true");
+
+      setTimeout(() => {
+        window.location.href = "../../index.html";
+      }, 3000);
+    }
+
+    /* ---------- KEY HANDLING ---------- */
+
+    window.addEventListener("keydown", e => {
+
+      if (e.code !== "Space") return;
+
+      if (container.innerText.includes("Instructions")) {
+
+        showPrep();
+
+      } else if (
+        container.innerText.includes("Get Ready")
+      ) {
+
+        startTrial();
+
+      }
+
+    });
+
+    showInstructions();
+  </script>
+</body>
+</html>
