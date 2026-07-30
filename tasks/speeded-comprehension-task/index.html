@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Speeded Comprehension Task (Auditory)</title>
+
+<style>
+html, body{
+    margin:0;
+    width:100%;
+    height:100%;
+    background:white;
+    font-family:Arial, Helvetica, sans-serif;
+}
+
+body{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+#container{
+    width:90%;
+    max-width:900px;
+    text-align:center;
+}
+
+h1,h2{
+    margin-bottom:20px;
+}
+
+textarea{
+    width:80%;
+    height:180px;
+    font-size:22px;
+    padding:15px;
+    resize:none;
+}
+
+button{
+    padding:15px 35px;
+    font-size:22px;
+    margin:20px;
+    cursor:pointer;
+}
+
+.choiceBtn{
+    width:180px;
+    height:70px;
+    font-size:28px;
+}
+
+#timer{
+    margin-top:20px;
+    color:#666;
+    font-size:18px;
+}
+
+.ear{
+    width:140px;
+    margin-bottom:25px;
+}
+</style>
+</head>
+<body>
+
+<div id="container"></div>
+
+<script>
+
+/************************************************************
+*********************** STIMULI ******************************
+************************************************************/
+
+const stimuli = [
+
+{
+    id:1,
+    audio:"ACVEFRSUAPSEQ_trialnum_9_imgid_61_speed_6-1.wav",
+    speed:80,
+
+    question1:"Did Diane visit her mother briefly?",
+    answer1:"yes",
+
+    question2:"Did Diane's mother live outside of the US?",
+    answer2:"no"
+},
+
+{
+    id:2,
+    audio:"ACVEFRSUAPSEQ_trialnum_58_imgid_60_speed_5-1.wav",
+    speed:60,
+
+    question1:"Was the baby wearing a bib?",
+    answer1:"yes",
+
+    question2:"Was the baby at home?",
+    answer2:"no"
+}
+
+];
+
+/************************************************************/
+
+const container = document.getElementById("container");
+
+let currentTrial = 0;
+
+let results = [];
+
+let trialData = {};
+
+let questionStart = 0;
+
+let countdownHandle = null;
+let questionTimeout = null;
+
+
+/************************************************************
+*********************** INSTRUCTIONS ************************
+************************************************************/
+
+function showInstructions(){
+
+container.innerHTML=`
+
+<h2>Instructions</h2>
+
+<p>You will hear a short audio clip.</p>
+
+<p>After listening, type as many words as you could understand.</p>
+
+<p>If you could not understand anything, type <b>"too fast"</b>.</p>
+
+<p>You will then answer two Yes/No comprehension questions.</p>
+
+<p><b>Press SPACE to begin.</b></p>
+
+`;
+
+}
+
+
+/************************************************************
+*********************** TRIAL *******************************
+************************************************************/
+
+function beginTrial(){
+
+trialData = {};
+
+container.innerHTML="";
+
+setTimeout(playAudio,1000);
+
+}
+
+
+/************************************************************
+*********************** AUDIO *******************************
+************************************************************/
+
+function playAudio(){
+
+    const stim = stimuli[currentTrial];
+
+    container.innerHTML = `
+        <h2>Listening...</h2>
+    `;
+
+    const audio = new Audio(stim.audio);
+
+    audio.addEventListener("ended", () => {
+
+        container.innerHTML = "";
+
+        setTimeout(showTypedRecall, 500);
+
+    }, { once: true });
+
+    audio.addEventListener("error", (e) => {
+
+        console.error("Couldn't load audio:", stim.audio);
+
+    });
+
+    audio.play().catch(err => {
+        console.error(err);
+    });
+
+}
+
+
+/************************************************************
+*********************** TYPED RECALL ************************
+************************************************************/
+
+function showTypedRecall(){
+
+container.innerHTML=`
+
+<h2>What words could you understand?</h2>
+
+<p>If you understood nothing, type <b>too fast</b>.</p>
+
+<textarea id="typedResponse"></textarea>
+
+<br>
+
+<button onclick="submitRecall()">
+Continue
+</button>
+
+`;
+
+}
+
+
+/************************************************************/
+
+function submitRecall(){
+
+trialData.typed_response =
+document.getElementById("typedResponse").value.trim();
+
+showQuestion(1);
+
+}
+
+
+/************************************************************
+*********************** QUESTIONS ***************************
+************************************************************/
+
+function showQuestion(number){
+
+const stim = stimuli[currentTrial];
+
+let question =
+number===1 ? stim.question1 : stim.question2;
+
+container.innerHTML=`
+
+<h2>${question}</h2>
+
+<button class="choiceBtn"
+onclick="answerQuestion(${number},'yes')">
+
+YES
+
+</button>
+
+<button class="choiceBtn"
+onclick="answerQuestion(${number},'no')">
+
+NO
+
+</button>
+
+<div id="timer"></div>
+
+`;
+
+questionStart = performance.now();
+
+let remaining = 4;
+
+document.getElementById("timer").textContent =
+`Time remaining: ${remaining}`;
+
+countdownHandle = setInterval(() => {
+
+    remaining--;
+
+    const t = document.getElementById("timer");
+
+    if (t) {
+        t.textContent = `Time remaining: ${remaining}`;
+    }
+
+}, 1000);
+
+questionTimeout = setTimeout(() => {
+
+    clearInterval(countdownHandle);
+
+    answerQuestion(number, "timeout");
+
+}, 4000);
+
+}
+
+
+/************************************************************/
+
+function answerQuestion(number,response){
+if (trialData["response" + number] !== undefined) return;
+clearInterval(countdownHandle);
+clearTimeout(questionTimeout);
+
+const stim = stimuli[currentTrial];
+
+const rt = response==="timeout"
+? null
+: Math.round(performance.now()-questionStart);
+
+const correctAnswer =
+number===1
+? stim.answer1
+: stim.answer2;
+
+trialData["response"+number] = response;
+
+trialData["correct"+number] =
+response===correctAnswer;
+
+trialData["rt"+number] = rt;
+
+if(number===1){
+
+showQuestion(2);
+
+}
+else{
+
+finishTrial();
+
+}
+
+}
+
+
+/************************************************************
+*********************** FINISH ******************************
+************************************************************/
+
+function finishTrial(){
+
+const stim = stimuli[currentTrial];
+
+results.push({
+
+trial:currentTrial+1,
+
+stimulus:stim.id,
+
+audio:stim.audio,
+
+speed:stim.speed,
+
+typed_response:trialData.typed_response,
+
+question1:stim.question1,
+
+correct_answer1:stim.answer1,
+
+response1:trialData.response1,
+
+correct1:trialData.correct1,
+
+rt1:trialData.rt1,
+
+question2:stim.question2,
+
+correct_answer2:stim.answer2,
+
+response2:trialData.response2,
+
+correct2:trialData.correct2,
+
+rt2:trialData.rt2
+
+});
+
+currentTrial++;
+
+if(currentTrial<stimuli.length){
+
+beginTrial();
+
+}
+else{
+
+showComplete();
+
+}
+
+}
+
+
+/************************************************************
+*********************** COMPLETE ****************************
+************************************************************/
+
+function showComplete(){
+
+console.log(results);
+
+container.innerHTML=`
+
+<h2>Task Complete</h2>
+
+<p>Thank you for participating.</p>
+
+<p>You may now return to the main page.</p>
+
+`;
+
+localStorage.setItem("done_exp7","true");
+
+setTimeout(()=>{
+
+window.location.href="../../index.html";
+
+},3000);
+
+}
+
+
+/************************************************************
+*********************** KEYBOARD ****************************
+************************************************************/
+
+window.addEventListener("keydown",(e)=>{
+
+if(e.code!=="Space") return;
+
+if(container.innerText.includes("Instructions")){
+
+beginTrial();
+
+}
+
+});
+
+
+/************************************************************/
+
+showInstructions();
+
+</script>
+
+</body>
+</html>
