@@ -1,0 +1,16 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Comprehension Task</title><style>body{font-family:Arial;text-align:center;margin:40px}#word{font-size:40px;height:60px}button{padding:8px 16px}textarea{width:80%;height:100px}</style></head><body>
+<div id="app"></div>
+<script src="stimuli.js"></script>
+<script>
+const app=document.getElementById('app');let order=[...stimuli].sort(()=>Math.random()-.5),i=0,data=[];
+function intro(){app.innerHTML='<h2>Comprehension Task</h2><p>Watch the words. Then type as many as you remember and answer questions.</p><button onclick="trial()">Begin</button>';}
+function trial(){if(i>=order.length)return end();let s=order[i];app.innerHTML='<div id=f>+</div>';setTimeout(()=>show(s),500);}
+function show(s){app.innerHTML='<div id=word></div>';let w=0;let dur=300;let iv=setInterval(()=>{word.textContent=s.sentence[w];w++;if(w>=s.sentence.length){clearInterval(iv);recall(s)}},dur);}
+function recall(s){app.innerHTML='<p>Type words you remember (or "too fast")</p><textarea id=r></textarea><br><button onclick="qs(0,s)">Continue</button>';}
+function qs(idx,s){if(idx==0){let rec=document.getElementById('r').value;data.push({id:s.id,recall:rec});}
+app.innerHTML='<p>'+s.questions[idx].text+'</p><button onclick="ans(\'Yes\','+idx+')">Yes</button> <button onclick="ans(\'No\','+idx+')">No</button>';
+window.cur={s:s,idx:idx};}
+function ans(a,idx){let d=data[data.length-1];d['q'+(idx+1)]=a;if(idx==0)qs(1,cur.s);else{i++;trial();}}
+function end(){let csv='id,recall,q1,q2\n'+data.map(x=>[x.id,x.recall,x.q1,x.q2].join(',')).join('\n');let blob=new Blob([csv]);let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='results.csv';app.innerHTML='<h2>Done</h2>';app.appendChild(a);a.textContent='Download Results';}
+intro();
+</script></body></html>

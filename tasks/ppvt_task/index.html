@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Peabody Picture Vocabulary Test</title>
+
+<style>
+html, body{
+    margin:0;
+    width:100%;
+    height:100%;
+    font-family:sans-serif;
+    background:white;
+}
+
+body{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+#container{
+    width:90%;
+    max-width:1000px;
+    text-align:center;
+}
+
+h1,h2{
+    margin-bottom:20px;
+}
+
+#word{
+    font-size:42px;
+    font-weight:bold;
+    margin-bottom:40px;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(2,250px);
+    gap:25px;
+    justify-content:center;
+}
+
+.choice{
+    border:3px solid #ddd;
+    border-radius:10px;
+    cursor:pointer;
+    transition:.15s;
+    padding:10px;
+}
+
+.choice:hover{
+    border-color:#4287f5;
+    transform:scale(1.02);
+}
+
+.choice img{
+    width:220px;
+    height:220px;
+    object-fit:contain;
+}
+</style>
+</head>
+
+<body>
+
+<div id="container"></div>
+
+<script>
+
+const container = document.getElementById("container");
+
+/******************************************************************
+ Replace with your own stimuli.
+ correct = filename (or unique id) of the correct picture.
+******************************************************************/
+
+const stimuli = [
+
+{
+    word:"sleeping",
+    correct:"1.png",
+    images:[
+        "4.png",
+        "3.png",
+        "2.png",
+        "1.png"
+    ]
+},
+
+{
+    word:"apple",
+    correct:"apple.png",
+    images:[
+        "banana.png",
+        "apple.png",
+        "pear.png",
+        "grapes.png"
+    ]
+},
+
+{
+    word:"chair",
+    correct:"chair.png",
+    images:[
+        "chair.png",
+        "table.png",
+        "bed.png",
+        "lamp.png"
+    ]
+}
+
+];
+
+let currentTrial = 0;
+let trialStart = 0;
+
+const results = [];
+
+
+/************************************************************/
+
+function shuffle(array){
+
+    const arr=[...array];
+
+    for(let i=arr.length-1;i>0;i--){
+
+        const j=Math.floor(Math.random()*(i+1));
+
+        [arr[i],arr[j]]=[arr[j],arr[i]];
+    }
+
+    return arr;
+}
+
+
+/************************************************************/
+
+function showInstructions(){
+
+container.innerHTML=`
+
+<h2>Instructions</h2>
+
+<p>You will see a word.</p>
+
+<p>Select the picture that matches the word.</p>
+
+<p><strong>Press SPACE to begin.</strong></p>
+
+`;
+
+}
+
+
+/************************************************************/
+
+function showReady(){
+
+container.innerHTML=`
+
+<h2>Get Ready</h2>
+
+<p>Press SPACE for the next trial.</p>
+
+`;
+
+}
+
+
+/************************************************************/
+
+function showTrial(){
+
+const stim=stimuli[currentTrial];
+
+const shuffled=shuffle(stim.images);
+
+let html=`
+
+<div id="word">${stim.word}</div>
+
+<div class="grid">
+
+`;
+
+for(const img of shuffled){
+
+html+=`
+
+<div class="choice"
+onclick="choose('${img}')">
+
+<img src="images/${img}">
+
+</div>
+
+`;
+
+}
+
+html+=`</div>`;
+
+container.innerHTML=html;
+
+trialStart=performance.now();
+
+}
+
+
+/************************************************************/
+
+function choose(selected){
+
+const rt=Math.round(performance.now()-trialStart);
+
+const stim=stimuli[currentTrial];
+
+results.push({
+
+trial:currentTrial+1,
+
+word:stim.word,
+
+correct_answer:stim.correct,
+
+selected_answer:selected,
+
+correct:selected===stim.correct,
+
+reaction_time_ms:rt
+
+});
+
+currentTrial++;
+
+if(currentTrial<stimuli.length){
+
+setTimeout(showReady,300);
+
+}
+else{
+
+saveResults();
+
+}
+
+}
+
+
+/************************************************************/
+
+async function saveResults(){
+
+const fileName=`picture_matching_${Date.now()}.json`;
+
+const blob=new Blob(
+[
+JSON.stringify(results,null,2)
+],
+{
+type:"application/json"
+}
+);
+
+try{
+
+const response=await fetch(
+"https://asd-lang-tasks-backend-production.up.railway.app/get-presigned-url",
+{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+
+file_name:fileName
+
+})
+
+}
+);
+
+if(!response.ok)
+throw new Error("Failed to get pre-signed URL");
+
+const {url}=await response.json();
+
+const upload=await fetch(url,{
+
+method:"PUT",
+
+body:blob,
+
+headers:{
+
+"Content-Type":"application/json"
+
+}
+
+});
+
+if(upload.ok){
+
+console.log("Results uploaded.");
+
+}
+else{
+
+console.error(await upload.text());
+
+}
+
+}
+catch(err){
+
+console.error(err);
+
+}
+
+showComplete();
+
+}
+
+
+/************************************************************/
+
+function showComplete(){
+
+container.innerHTML=`
+
+<h2>Task Complete</h2>
+
+<p>Thank you for participating.</p>
+
+<p>You may now return to the main page.</p>
+
+`;
+
+
+// Change the experiment number if needed
+localStorage.setItem("done_exp3","true");
+
+setTimeout(()=>{
+
+window.location.href="../../index.html";
+
+},3000);
+
+}
+
+
+/************************************************************/
+
+window.addEventListener("keydown",(e)=>{
+
+if(e.code!=="Space") return;
+
+if(container.innerText.includes("Instructions")){
+
+showReady();
+
+}
+else if(container.innerText.includes("Get Ready")){
+
+showTrial();
+
+}
+
+});
+
+showInstructions();
+
+</script>
+
+</body>
+</html>
